@@ -92,6 +92,7 @@ class Oximeter:
 						sys.stderr.write("Oximeter thread: trying to open: "+port+"\n")
 						self.open(port)
 						count=-1
+						continue
 					else:
 						self.waveformValue = 64+32*math.sin(t)
 						self.signalStrength = 0
