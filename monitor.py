@@ -81,8 +81,8 @@ PR = 0; SPO2 = 1; TEMP = 2
 parameters = {}            # name     unit     color     format min  max  plotid
 parameters[PR]   = Parameter(u'PR',   u'bpm', '#00d000', "%.0f", 50, 120, 0) # #87CEFA
 parameters[SPO2] = Parameter(u'SpO₂', u'%',   '#50CCFF', "%.0f", 93, 100, 1)
-#parameters[TEMP] = Parameter(u'TEMP', u'°C',  '#FF5000', "%.1f", 36,  38, 2)
-#parameters[TEMP].updateValue(39.15)
+parameters[TEMP] = Parameter(u'TEMP', u'°C',  '#FF5000', "%.1f", 36,  38, 2)
+parameters[TEMP].updateValue(37.15); parameters[TEMP].info = "SIMULATED"
 
 X_fast_oximeter = range(200); Y_fast_oximeter = 200*[0]; Y_fast_oximeter_index = 0; beat = False
 def OximeterCallback(SpO2, pulse_rate):
@@ -140,17 +140,18 @@ class MonitorGUI(QWidget):
 	def initUI(self):
 		self.setStyleSheet("\
 			QWidget { background-color: #000000; color: #ffffff; } \
+			QLabel { margin: 0px; padding: 0px; } \
 			QSplitter::handle:vertical   { image: none; } \
 			QSplitter::handle:horizontal { width:  2px; image: none; } \
 			QPushButton { background-color: #404040; } \
 			QLabel#c_names { font-size: 30pt; } \
 			QLabel#c_units { font-size: 20pt; } \
 			QLabel#c_limits { font-size: 10pt; } \
-			QLabel#c_values { font-size: 70pt; margin: 0px; padding: 0px; } \
+			QLabel#c_values { font-size: 70pt; padding-top: -16px; padding-bottom: -15px; } \
 			QLabel#c_infos { font-size: 15pt; } \
 			QLabel#clockLabel { color: #707070; font-size: 10pt; } \
 			QLabel#clock { color: #ffffff; font-size: 15pt; } \
-			QGroupBox { border: 1px solid #707070; border-radius: 8px; background-color: #000000; } \
+			QGroupBox { border: 1px solid #707070; border-radius: 8px; }\
 		");
 
 		# elements in the left part of the screen
@@ -175,6 +176,7 @@ class MonitorGUI(QWidget):
 			axis = DummyAxis
 			if i == len(plotids) - 1: axis = DateAxis
 			pw = pyqtgraph.PlotWidget(axisItems={'bottom': axis(orientation='bottom')})
+			#pw.getAxis('left').setTickSpacing(1, 0.5)
 			if i > 0:
 				pw.setXLink(self.trendsPw[0])
 			pw.getViewBox().setMouseMode(pw.getViewBox().RectMode) # one button mode
@@ -205,26 +207,30 @@ class MonitorGUI(QWidget):
 			hbox = QHBoxLayout()
 			self.c_names[i] = QLabel()
 			self.c_names[i].setObjectName('c_names')
-			self.c_names[i].setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+			self.c_names[i].setAlignment(Qt.AlignLeft | Qt.AlignTop)
 			self.c_names[i].setText(parameters[i].name)
 			hbox.addWidget(self.c_names[i])
 
+			vbox2 = QVBoxLayout()
 			self.c_units[i] = QLabel()
 			self.c_units[i].setObjectName('c_units')
-			self.c_units[i].setAlignment(Qt.AlignRight | Qt.AlignBottom)
-			self.c_units[i].setText('  '+parameters[i].unit)
-			hbox.addWidget(self.c_units[i])
-			vbox.addLayout(hbox)
+			self.c_units[i].setAlignment(Qt.AlignRight | Qt.AlignTop)
+			self.c_units[i].setText(parameters[i].unit)
+			vbox2.addWidget(self.c_units[i])
+
 
 			self.c_limits[i] = QLabel()
 			self.c_limits[i].setObjectName('c_limits')
-			self.c_limits[i].setAlignment(Qt.AlignRight | Qt.AlignBottom)
+			self.c_limits[i].setAlignment(Qt.AlignRight | Qt.AlignTop)
 			self.c_limits[i].setText(str(parameters[i].min)+"-"+str(parameters[i].max))
-			vbox.addWidget(self.c_limits[i])
+			vbox2.addWidget(self.c_limits[i])
+			hbox.addLayout(vbox2)
+
+			vbox.addLayout(hbox)
 
 			self.c_values[i] = QLabel()
 			self.c_values[i].setObjectName('c_values')
-			self.c_values[i].setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+			self.c_values[i].setAlignment(Qt.AlignRight | Qt.AlignTop)
 			self.c_values[i].setText('-')
 
 			vbox.addWidget(self.c_values[i])
@@ -328,11 +334,11 @@ class MonitorGUI(QWidget):
 
 	def setFrameStyleSheet(self, i):
 		if math.isnan(parameters[i].value):
-			self.c_frames[i].setStyleSheet("QGroupBox { border: 1px solid %s; border-radius: 8px; background-color: #000000; } QLabel { color: #555555; background-color: #000000;}" % (parameters[i].color));
+			self.c_frames[i].setStyleSheet("QGroupBox { border: 1px solid %s; border-radius: 8px; } QLabel { color: #555555; background-color: transparent; }" % (parameters[i].color));
 		elif (parameters[i].value < parameters[i].min or parameters[i].value > parameters[i].max):
-			self.c_frames[i].setStyleSheet("QGroupBox { border: 4px solid %s; border-radius: 8px; background-color: #ff0000; } QLabel { color: #000000; background-color: transparent;}" % parameters[i].color);
+			self.c_frames[i].setStyleSheet("QGroupBox { border: 4px solid %s; border-radius: 8px; background-color: #ff0000; } QLabel { color: #000000; background-color: transparent; }" % parameters[i].color);
 		else:
-			self.c_frames[i].setStyleSheet("QGroupBox { border: 1px solid %s; border-radius: 8px; background-color: #000000; } QLabel { color: %s; background-color: #000000;}" % (parameters[i].color, parameters[i].color));
+			self.c_frames[i].setStyleSheet("QGroupBox { border: 1px solid %s; border-radius: 8px; } QLabel { color: %s; }" % (parameters[i].color, parameters[i].color));
 
 	def keyPressEvent(self, event):
 		if (event.key() ==  Qt.Key_F11):

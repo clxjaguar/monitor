@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# Module for the somewhat generic brand pulse oximeter. It's VCP based
+# mine is 10c4:ea60, CP2102 USB to UART. I really need to find a name for this.
+# "USB Oximeter PC based Pulse Oximeter SpO2 monitor usb probe (1 cable + 1 adult sensor)"
+#
+# Beginning of the reverse engineering in 2018-09-17 by @cLxJaguar
+#
+# sudo apt-get install python-pip python-setuptools
+# pip install --upgrade pip
+# sudo pip install -U pyserial
 
 import serial, sys, time, math
 
