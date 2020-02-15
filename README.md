@@ -7,7 +7,11 @@ What it looks like. It's still a WIP. Maybe a day, i'll learn how make totally m
 ![Fullscreen monitor](media/fullscreen.png)
 
 # Oximeter hardware
-I'm not sure about the oximeter name or brand. It connects to computer by USB and are easy to find on Aliexpress or eBay. The proprietary software is looking like this:
+I'm not sure about the oximeter name or brand. It connects to computer by USB and are easy to find on Aliexpress or eBay.
+
+![USB Oximeter](media/usb_oximeter.jpg)
+
+ The proprietary software is looking like this:
 
 ![Oximeter proprietary software](media/usb_oximeter_proprietary_software.jpg)
 
