@@ -297,6 +297,7 @@ class MonitorGUI(QWidget):
 		# Start timers
 		self.timerUpdateUi.start(50)
 		self.timerClock.start(1000)
+		self.trends_time_ref = time.time()
 
 	def timerUpdateUiTimeout(self):
 		global beat
@@ -319,7 +320,7 @@ class MonitorGUI(QWidget):
 				self.last_graphed_time = time.time()
 
 				# update trends
-				self.trends_time.append(time.time())
+				self.trends_time.append(time.time() - self.trends_time_ref)
 				for i in range(len(parameters)):
 					parameters[i].copyValueToTrends()
 
@@ -376,6 +377,7 @@ class MonitorGUI(QWidget):
 
 	def btnReset(self):
 		self.trends_time = []
+		self.trends_time_ref = time.time()
 		for i in range(len(parameters)):
 			parameters[i].trends = []
 		self.last_graphed_time = 0
@@ -412,9 +414,10 @@ class DateAxis(pyqtgraph.AxisItem):
 			string = self.lastString
 
 		strns = []
-		for x in values:
+		for value in values:
 			try:
-				strns.append(time.strftime(string, time.localtime(x)))
+				# pyqtgraph seems to don't handle so large numbers on raspberry pi so we're using a reference
+				strns.append(time.strftime(string, time.localtime(value + m1.trends_time_ref)))
 			except ValueError:  ## Windows can't handle dates before 1970
 				strns.append('')
 		return strns
