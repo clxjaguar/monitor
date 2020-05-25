@@ -197,6 +197,13 @@ class MonitorGUI(QWidget):
 		self.c_values = {}
 		self.c_infos = {}
 
+		def mkQLabel(objectName, text='', alignment=Qt.AlignLeft):
+			o = QLabel()
+			o.setObjectName(objectName)
+			o.setAlignment(alignment)
+			o.setText(text)
+			return o
+
 		for i in range(len(parameters)):
 			self.c_frames[i] = QGroupBox()
 			self.setFrameStyleSheet(i)
@@ -204,43 +211,23 @@ class MonitorGUI(QWidget):
 			vbox = QVBoxLayout(self.c_frames[i])
 			vbox.setSpacing(0)
 
+			self.c_names[i]  = mkQLabel('c_names', parameters[i].name, Qt.AlignLeft | Qt.AlignTop)
+			self.c_units[i]  = mkQLabel('c_units', parameters[i].unit, Qt.AlignRight | Qt.AlignTop)
+			self.c_limits[i] = mkQLabel('c_limits', str(parameters[i].min)+"-"+str(parameters[i].max), Qt.AlignRight | Qt.AlignTop)
+			self.c_values[i] = mkQLabel('c_values', '-', Qt.AlignRight | Qt.AlignTop)
+			self.c_infos[i]  = mkQLabel('c_infos', parameters[i].info)
+
 			hbox = QHBoxLayout()
-			self.c_names[i] = QLabel()
-			self.c_names[i].setObjectName('c_names')
-			self.c_names[i].setAlignment(Qt.AlignLeft | Qt.AlignTop)
-			self.c_names[i].setText(parameters[i].name)
 			hbox.addWidget(self.c_names[i])
 
 			vbox2 = QVBoxLayout()
-			self.c_units[i] = QLabel()
-			self.c_units[i].setObjectName('c_units')
-			self.c_units[i].setAlignment(Qt.AlignRight | Qt.AlignTop)
-			self.c_units[i].setText(parameters[i].unit)
 			vbox2.addWidget(self.c_units[i])
-
-
-			self.c_limits[i] = QLabel()
-			self.c_limits[i].setObjectName('c_limits')
-			self.c_limits[i].setAlignment(Qt.AlignRight | Qt.AlignTop)
-			self.c_limits[i].setText(str(parameters[i].min)+"-"+str(parameters[i].max))
 			vbox2.addWidget(self.c_limits[i])
 			hbox.addLayout(vbox2)
 
 			vbox.addLayout(hbox)
-
-			self.c_values[i] = QLabel()
-			self.c_values[i].setObjectName('c_values')
-			self.c_values[i].setAlignment(Qt.AlignRight | Qt.AlignTop)
-			self.c_values[i].setText('-')
-
 			vbox.addWidget(self.c_values[i])
-
-			self.c_infos[i] = QLabel()
-			self.c_infos[i].setObjectName('c_infos')
-
-			self.c_infos[i].setText(parameters[i].info)
 			vbox.addWidget(self.c_infos[i])
-
 			right_layout.addWidget(self.c_frames[i])
 
 		right_layout.addStretch()
