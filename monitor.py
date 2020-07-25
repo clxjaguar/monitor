@@ -13,13 +13,16 @@ def pipRun(command):
 
 pipInstallRan = False
 def pipInstall(package):
-	global pipInstallRan
-	print("We want to install: "+package)
-	if not pipInstallRan:
-		pipInstallRan = True
-		pipRun(sys.executable+" -m pip install --user --upgrade pip")
-		pipRun(sys.executable+" -m pip install --user setuptools")
-	pipRun(sys.executable+" -m pip install --user "+package)
+	if not '--pipInstallRan' in sys.argv:
+		global pipInstallRan
+		print("We want to install: "+package)
+		if not pipInstallRan:
+			pipInstallRan = True
+			pipRun(sys.executable+" -m pip install --user --upgrade pip")
+			pipRun(sys.executable+" -m pip install --user setuptools")
+		pipRun(sys.executable+" -m pip install --user "+package)
+	else:
+		raise
 
 try:
 	from PyQt4.QtGui import *
@@ -43,11 +46,10 @@ except:
 	pipInstall("pyserial")
 
 if pipInstallRan:
-	cmd = sys.executable+' '+' '.join(sys.argv)
+	cmd = sys.executable+' '+' '.join(sys.argv)+' --pipInstallRan'
 	print("Re-exec: "+cmd)
-	time.sleep(2)
-	os.system(cmd)
 	time.sleep(1)
+	os.system(cmd)
 	exit(-1)
 
 import usb_oximeter
