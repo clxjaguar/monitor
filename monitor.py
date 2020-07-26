@@ -1,9 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# sudo apt-get install python-pip python-pyside python-setuptools python-pyqtgraph
-# pip install --user --upgrade pip
-# pip install --user --upgrade pyserial
+# sudo apt-get install python3-pip python3-setuptools python3-pyqtgraph
+# python3 -m pip install --upgrade pip
+# python3 -m pip install --upgrade pyserial
+# python3 -m pip install pyqt5==5.13.0
+# use this pyqt5 version if there is graph is some points are NaN (5.14.1 was bugged)
 
 import os, sys, time, math, threading
 
@@ -28,7 +30,12 @@ try:
 	from PyQt4.QtGui import *
 	from PyQt4.QtCore import *
 except:
-	pipInstall("PyQt4")
+	try:
+		from PyQt5.QtGui import *
+		from PyQt5.QtCore import *
+		from PyQt5.QtWidgets import *
+	except:
+		pipInstall("pyqt5")
 
 try:
 	import numpy
@@ -145,7 +152,7 @@ class MonitorGUI(QWidget):
 			QLabel { margin: 0px; padding: 0px; } \
 			QSplitter::handle:vertical   { image: none; } \
 			QSplitter::handle:horizontal { width:  2px; image: none; } \
-			QPushButton { background-color: #404040; } \
+			QPushButton { background-color: #404040; background: #404040; } \
 			QLabel#c_names { font-size: 30pt; } \
 			QLabel#c_units { font-size: 20pt; } \
 			QLabel#c_limits { font-size: 10pt; } \
@@ -237,14 +244,26 @@ class MonitorGUI(QWidget):
 		def makeButton(text, function):
 			btn = QPushButton(text)
 			btn.setFocusPolicy(Qt.TabFocus)
+			#btn.setAutoFillBackground(True);
+			# ~ #palette_red.setColor(btn.backgroundRole(), QColor(255, 0, 0, 127))
+			# ~ p = btn.palette()
+			# ~ p.setColor(btn.backgroundRole(), Qt.red)
+			# ~ btn.setPalette(p);
+			btn.setStyleSheet("border: none;") # workaround for PyQt5 bug with button background color
+			# ~ btn.setStyleSheet("") # workaround for PyQt5 bug with button background color
 			btn.clicked.connect(function)
 			return btn
 
 		# buttons
-		right_layout.addWidget(makeButton("Clear plots", self.btnReset))
-		right_layout.addWidget(makeButton("Autorange", self.btnAutoRange))
-		right_layout.addWidget(makeButton("Full/Window", self.btnFullScreen))
-		right_layout.addWidget(makeButton("Exit", self.close))
+		self.buttons = []
+		self.buttons.append(makeButton("Clear plots", self.btnReset))
+		self.buttons.append(makeButton("Autorange", self.btnAutoRange))
+		self.buttons.append(makeButton("Full/Window", self.btnFullScreen))
+		self.buttons.append(makeButton("Exit", self.close))
+
+		for btn in self.buttons:
+			right_layout.addWidget(btn)
+			# ~ btn.setStyleSheet("")
 
 		# clock
 		timeLabel = QLabel("Time")
@@ -287,6 +306,10 @@ class MonitorGUI(QWidget):
 		self.timerUpdateUi.start(50)
 		self.timerClock.start(1000)
 		self.trends_time_ref = time.time()
+
+		# ~ for btn in self.buttons:
+			# ~ # right_layout.addWidget(btn)
+			# ~ btn.setStyleSheet("")
 
 	def timerUpdateUiTimeout(self):
 		global beat

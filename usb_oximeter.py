@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 # Module for the somewhat generic brand pulse oximeter. It's VCP based
@@ -63,7 +63,7 @@ class Oximeter:
 		self.unfiltered_pulse_rate=0
 
 	def worker(self):
-		print "Thread started: OximeterWorker()"
+		print("Thread started: OximeterWorker()")
 		count=-1
 		i = 0
 		t = 0
@@ -141,7 +141,7 @@ class Oximeter:
 
 			self.callback(self.SpO2, self.pulseRate)
 		self.close()
-		print "Thread stopped: OximeterWorker()"
+		print("Thread stopped: OximeterWorker()")
 
 
 def OximeterDemo(SpO2, pulse_rate):
