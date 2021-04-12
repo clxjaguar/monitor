@@ -77,9 +77,7 @@ class Trace():
 		self.pw.showAxis('left', show=False)
 		self.pw.setMouseEnabled(False, False)
 		self.pw.setXRange(0, 10, padding=0)
-		# ~ self.pw = QLabel()
-		self.pw.setStyleSheet("background-color: red")
-		self.pw.setContentsMargins(0,0,0,0);
+		self.pw.hideButtons()
 		self.update()
 
 	def addPoint(self, waveformValue):
