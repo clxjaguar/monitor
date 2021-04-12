@@ -43,9 +43,12 @@ except:
 	pipInstall("numpy")
 
 try:
-	import pyqtgraph # needs import PyQt4 before!
+	import pyqtgraph # import PyQt4 or 5 before this line!
 except:
 	pipInstall("pyqtgraph")
+
+pyqtgraph.setConfigOptions(useOpenGL=True)
+pyqtgraph.setConfigOptions(antialias=True)
 
 try:
 	import serial
@@ -59,23 +62,188 @@ if pipInstallRan:
 	os.system(cmd)
 	exit(-1)
 
-import usb_oximeter
+tracesTimeRef = time.time()
+class Trace():
+	def __init__(self, ident, color):
+		self.ident = ident
+		self.color = color
+		self.traceT = []
+		self.traceX = []
+		self.traceY = []
+		self.pw = None
+
+	def createWidget(self):
+		self.pw = pyqtgraph.PlotWidget()
+		self.pw.showAxis('bottom', show=False)
+		self.pw.showAxis('left', show=False)
+		self.pw.setMouseEnabled(False, False)
+		self.pw.setXRange(0, 10, padding=0)
+		# ~ self.pw = QLabel()
+		self.pw.setStyleSheet("background-color: red")
+		self.pw.setContentsMargins(0,0,0,0);
+		self.update()
+
+	def addPoint(self, waveformValue):
+		"""function to be called by plugins in another thread than the main thread"""
+		now = time.time()
+
+		self.traceT.append(now)
+		self.traceX.append(now - tracesTimeRef)
+		self.traceY.append(waveformValue)
+		self.updateFlag = True
+
+	def update(self):
+		try:
+			while self.traceT[0] <= time.time()-9.9:
+				del self.traceT[0]
+				del self.traceX[0]
+				del self.traceY[0]
+		except:
+			pass
+
+		self.pw.plot(self.traceX, self.traceY, clear=True, pen=self.color, connect='finite')
+		self.updateFlag = False
+
+class TracesSet():
+	def __init__(self):
+		self.traces = {}
+
+	def initialyzeWidgets(self):
+		self.tracesSplitter = QSplitter(Qt.Vertical)
+		self.tracesSplitter.addWidget(QLabel("UNINITIALIZED TRACES SET!"))
+
+	def generateTracesPlots(self):
+		# delete everything existing in the tracesSet qsplitter
+		for i in range(self.tracesSplitter.count()):
+			self.tracesSplitter.widget(i).deleteLater()
+
+		# then (re)create the plotwidgets
+		for ident in self.traces:
+			trace = self.traces[ident]
+			trace.createWidget()
+			self.tracesSplitter.addWidget(trace.pw)
+
+	def addTrace(self, ident, *kargs, **kwargs):
+		print("Adding trace", ident)
+		self.traces[ident] = Trace(ident, *kargs, **kwargs)
+		return self.traces[ident]
+
+	def update(self):
+		global tracesTimeRef, tracesClearModeFlag
+		if time.time() - tracesTimeRef > 10:
+			for ident in self.traces:
+				self.traces[ident].addPoint(float('nan'))
+			tracesTimeRef = time.time()
+
+		for ident in self.traces:
+			trace = self.traces[ident]
+			if trace.updateFlag:
+				trace.update()
+
+	def removeTrace(self, ident):
+		del self.traces[ident]
 
 class Parameter():
-	def __init__(self, name, unit, color, format, vmin, vmax, plotid=0):
+	NO_SIGNAL = 1
+	ALARM     = 2
+	NOMINAL   = 3
+	DEFAULT   = -1
+
+	def __init__(self, ident, name, unit, plotName, color, format, vmin, vmax):
+		self.ident = ident
+		self.nextRefresh = 0
 		self.name = name
+		self.plotName = plotName
 		self.unit = unit
 		self.color = color
 		self.format = format
 		self.value = float("nan")
 		self.min = vmin
 		self.max = vmax
-		self.plotid = plotid
+		self.plotId = None
+		self.frameState = self.DEFAULT
 		self.info = ""
 		self.trends = []
+		print("Created parameter:", name)
+
+	def __del__(self):
+		print("Deleted parameter:", self.name)
+
+	def updateFrameStyleSheet(self, force=False):
+		if math.isnan(self.value):  newState = self.NO_SIGNAL
+		elif self.value < self.min: newState = self.ALARM
+		elif self.value > self.max: newState = self.ALARM
+		else:                       newState = self.NOMINAL
+
+		if newState != self.frameState or force:
+			if force:
+				self.frameState = self.DEFAULT
+			else:
+				self.frameState = newState
+
+			if newState == self.NO_SIGNAL:
+				styleStr = "QGroupBox { border: 1px solid $PARAMCOLOR; } QLabel { color: #555555; background-color: transparent; }"
+			elif newState == self.ALARM:
+				styleStr = "QGroupBox { border: 4px solid $PARAMCOLOR; background-color: #ff0000; } QLabel { color: #000000; background-color: transparent; }"
+			elif newState == self.NOMINAL:
+				styleStr = "QGroupBox { border: 1px solid $PARAMCOLOR; } QLabel { color: $PARAMCOLOR; }"
+			else:
+				styleStr = ""
+
+			self.widget.setStyleSheet(styleStr.replace("$PARAMCOLOR", self.color))
+
+	def createWidgets(self):
+		class QValueLabel(QLabel):
+			def sizeHint(self):
+				return super().sizeHint() + QSize(0, -14)
+			def minimumSizeHint(self):
+				return super().minimumSizeHint() + QSize(0, -14)
+
+		def mkQLabel(objectName, text='', alignment=Qt.AlignLeft, o=None):
+			if o is None:
+				o=QLabel()
+			o.setObjectName(objectName)
+			o.setAlignment(alignment)
+			o.setText(text)
+			return o
+
+		self.widget = QGroupBox()
+		self.widget.setFlat(True);
+		vbox = QVBoxLayout(self.widget)
+		vbox.setSpacing(0)
+		vbox.setContentsMargins(4, 2, 4, 2)
+
+		self.nameLabel   = mkQLabel('names', self.name, Qt.AlignLeft | Qt.AlignTop)
+		self.unitLabel   = mkQLabel('units', self.unit, Qt.AlignRight | Qt.AlignTop)
+		self.limitsLabel = mkQLabel('limits', str(self.min)+"-"+str(self.max), Qt.AlignRight | Qt.AlignTop)
+		self.valueLabel  = mkQLabel('values', '---', Qt.AlignRight | Qt.AlignTop, QValueLabel())
+		self.infosLabel  = mkQLabel('infos', '')
+
+		# fix the height of infosLabel widget (we don't want it to vary later)
+		height = self.infosLabel.sizeHint().height()
+		self.infosLabel.setFixedHeight(int(height*1.6))
+
+		hbox = QHBoxLayout()
+		hbox.addWidget(self.nameLabel)
+
+		vbox2 = QVBoxLayout()
+		vbox2.addWidget(self.unitLabel)
+		vbox2.addWidget(self.limitsLabel)
+		hbox.addLayout(vbox2)
+
+		vbox.addLayout(hbox)
+		vbox.addWidget(self.valueLabel)
+		vbox.addWidget(self.infosLabel)
+		self.updateFrameStyleSheet(force=True)
 
 	def updateValue(self, value):
-		self.value = value
+		if value != self.value:
+			self.value = value
+
+	def updateWidgets(self):
+		self.valueLabel.setText(self.getValueStr())
+		self.infosLabel.setText(self.info)
+		self.updateFrameStyleSheet()
 
 	def copyValueToTrends(self):
 		self.trends.append(self.value)
@@ -86,159 +254,169 @@ class Parameter():
 		else:
 			return(self.format % self.value)
 
-PR = 0; SPO2 = 1; TEMP = 2
-parameters = {}            # name     unit     color     format min  max  plotid
-parameters[PR]   = Parameter(u'PR',   u'bpm', '#00d000', "%.0f", 50, 120, 0) # #87CEFA
-parameters[SPO2] = Parameter(u'SpO₂', u'%',   '#50CCFF', "%.0f", 93, 100, 1)
-parameters[TEMP] = Parameter(u'TEMP', u'°C',  '#FF5000', "%.1f", 36,  38, 2)
-parameters[TEMP].updateValue(37.15); parameters[TEMP].info = "SIMULATED"
+class ParametersSet():
+	def __init__(self):
+		self.trends_time_ref = time.time()
+		self.parameters = {}
 
-X_fast_oximeter = range(200); Y_fast_oximeter = 200*[0]; Y_fast_oximeter_index = 0; beat = False
-def OximeterCallback(SpO2, pulse_rate):
-	global oxi1, m1, beat, parameters
-	global X_fast_oximeter, Y_fast_oximeter, Y_fast_oximeter_index
+	def initialyzeWidgets(self):
+		self.numericLayout = QVBoxLayout()
+		self.trendsSplitter = QSplitter(Qt.Vertical)
+		self.plots = {}
+		self.trendsPw = []
 
-	if (SpO2 != 0):
-		parameters[SPO2].updateValue(SpO2)
-	else:
-		parameters[SPO2].updateValue(float('nan'))
-	if (pulse_rate != 0):
-		parameters[PR].updateValue(pulse_rate)
-	else:
-		parameters[PR].updateValue(float('nan'))
+	def generateTrendsPlots(self):
+		for pw in self.trendsPw:
+			pw.deleteLater()
+			del pw
 
-	if (oxi1.SpO2dropping):
-		parameters[PR].info = ""
-		parameters[SPO2].info = "SPO2 DROPPING!"
-		m1.div_refresh_values = 0
-	elif (oxi1.probeError):
-		parameters[PR].info = "PROBE ERROR"
-		parameters[SPO2].info  = "PROBE ERROR"
-		m1.div_refresh_values = 0
-	elif (oxi1.searchingTooLong):
-		parameters[PR].info = "SEARCHING!"
-		parameters[SPO2].info = "SEARCHING!"
-		m1.div_refresh_values = 0
-	elif (oxi1.searching):
-		parameters[PR].info = "SEARCHING"
-		parameters[SPO2].info = "SEARCHING"
-	else:
-		parameters[PR].info = ""
-		parameters[SPO2].info = str('S'+str(oxi1.signalStrength)+' '+oxi1.bargraphValue*'|')
+		plotCntr = 0
+		plotsNames = {}
+		for p in self.parameters:
+			try:
+				self.parameters[p].plotId = plotsNames[self.parameters[p].unit]
+			except:
+				plotsNames[self.parameters[p].unit] = plotCntr
+				self.parameters[p].plotId = plotCntr
+				plotCntr+=1
 
-	if (oxi1.pulse):
-		beat = True
-		m1.div_refresh_values = 0
+		self.trends_time = []
+		self.trendsPw = []
+		first = True
+		for plotName in plotsNames:
+			axis = DummyAxis
+			if len(self.trendsPw) == len(plotsNames)-1: axis = DateAxis
+			pw = pyqtgraph.PlotWidget(axisItems={'bottom': axis(orientation='bottom')})
+			if not first:
+				pw.setXLink(self.trendsPw[0])
+			pw.getViewBox().setMouseMode(pw.getViewBox().RectMode) # one button mode
+			pw.getAxis('left').setWidth(50)
+			pw.showGrid(x=True, y=True)
+			self.trendsSplitter.addWidget(pw)
+			self.trendsPw.append(pw)
+			first=False
 
-	# update data for fast curve ...
-	try:
-		Y_fast_oximeter[Y_fast_oximeter_index] = oxi1.waveformValue
-		Y_fast_oximeter_index+=1
-		Y_fast_oximeter[Y_fast_oximeter_index] = float('nan')
-	except:
-		Y_fast_oximeter[0] = oxi1.waveformValue
-		Y_fast_oximeter_index=1
+		for p in self.parameters:
+			self.trendsPw[self.parameters[p].plotId].setLabel('left', text=self.parameters[p].plotName, units=self.parameters[p].unit)
+
+	def updateTrends(self):
+		self.trends_time.append(time.time() - self.trends_time_ref)
+		for p in self.parameters:
+			self.parameters[p].copyValueToTrends()
+
+		for pw in self.trendsPw:
+			pw.clear()
+
+		for p in self.parameters:
+			pw = self.trendsPw[self.parameters[p].plotId]
+			pw.plot(self.trends_time, self.parameters[p].trends, pen=self.parameters[p].color, connect='finite', clear=False)
+
+	def addParameter(self, ident, *kargs, **kwargs):
+		print("adding", ident)
+		self.parameters[ident] = parameter = Parameter(ident, *kargs, **kwargs)
+		parameter.createWidgets()
+		self.numericLayout.addWidget(parameter.widget)
+		return self.parameters[ident]
+
+	def updateParametersWidgets(self):
+		for ident in self.parameters:
+			parameter = self.parameters[ident]
+			if parameter.nextRefresh <= time.time():
+				parameter.updateWidgets()
+				parameter.nextRefresh = time.time() + 0.2
+
+	def removeParameter(self, ident):
+		self.numericLayout.removeWidget(self.parameters[ident].widget)
+		del self.parameters[ident]
+
+class Plugin():
+	def __init__(self, name):
+		print("Loading plugin:", name)
+		self.name = name
+
+		try:
+			self.module = __import__("%s" % self.name)
+		except Exception as e:
+			self.module = None
+			print('PLUGIN ERROR (%s): %s' % (self.name, e))
+
+	def load(self):
+		try:
+			self.PluginClass = self.module.MonitorPlugin(parametersSet, tracesSet)
+			self.PluginClass.load()
+		except Exception as e:
+			print('PLUGIN ERROR (%s): %s' % (self.name, e))
+	def unload(self):
+		try:
+			self.PluginClass.unload()
+		except Exception as e:
+			print('PLUGIN ERROR (%s): %s' % (self.name, e))
+
+class PluginManager():
+	def __init__(self):
+		self.plugins = {}
+		for filename in os.listdir(os.path.dirname(os.path.abspath(__file__))):
+			if filename.endswith("_plugin.py"):
+				if filename.endswith(".py"):
+					name = filename[:len(filename)-3]
+					self.plugins[name] = Plugin(name)
+
+	def loadEverything(self):
+		for name in self.plugins:
+			self.plugins[name].load()
+
+	def __del__(self):
+		for name in self.plugins:
+			self.plugins[name].unload()
+
+tracesSet = TracesSet()
+parametersSet = ParametersSet()
+pluginManager = PluginManager()
 
 class MonitorGUI(QWidget):
 	def __init__(self):
 		super(MonitorGUI, self).__init__()
 		self.trends_time = []
-		self.div_refresh_values = 0
+		self.last_graphed_time = 0
+
+		tracesSet.initialyzeWidgets()
+		parametersSet.initialyzeWidgets()
+		pluginManager.loadEverything()
+
+		tracesSet.generateTracesPlots()
+		parametersSet.generateTrendsPlots()
+
 		self.initUI()
 
 	def initUI(self):
 		self.setStyleSheet("\
 			QWidget { background-color: #000000; color: #ffffff; } \
-			QLabel { margin: 0px; padding: 0px; } \
+			QLabel { margin: 0px; padding-top: 0px; padding-bottom: 0px; } \
 			QSplitter::handle:vertical   { image: none; } \
 			QSplitter::handle:horizontal { width:  2px; image: none; } \
 			QPushButton { background-color: #404040; background: #404040; } \
-			QLabel#c_names { font-size: 30pt; } \
-			QLabel#c_units { font-size: 20pt; } \
-			QLabel#c_limits { font-size: 10pt; } \
-			QLabel#c_values { font-size: 70pt; padding-top: -16px; padding-bottom: -15px; } \
-			QLabel#c_infos { font-size: 15pt; } \
+			QLabel#names { font-size: 30pt; } \
+			QLabel#units { font-size: 20pt; } \
+			QLabel#limits { font-size: 10pt; } \
+			QLabel#values { font-size: 80pt; } \
+			QLabel#infos { font-size: 15pt; } \
 			QLabel#clockLabel { color: #707070; font-size: 10pt; } \
-			QLabel#clock { color: #ffffff; font-size: 15pt; } \
-			QGroupBox { border: 1px solid #707070; border-radius: 8px; }\
+			QLabel#clock { font-size: 15pt; } \
+			QGroupBox { border: 1px solid #707070; border-radius: 8px; padding: 0px; }\
+			QLayout {padding-top: 100px; }\
 		");
 
 		# elements in the left part of the screen
-		left_layout = QVBoxLayout()
-		splitter1 = QSplitter(Qt.Vertical)
-
-		splitter1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-		left_layout.addWidget(splitter1)
+		self.allCurvesSplitter = QSplitter(Qt.Vertical)
+		self.allCurvesSplitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
 		# pyqtgraph curves
-		self.oximeter = pyqtgraph.PlotWidget()
-		self.oximeter.showAxis('bottom', show=False)
-		self.oximeter.showAxis('left', show=False)
-		splitter1.addWidget(self.oximeter)
-
-		plotids = []
-		for i in parameters:
-			plotids.append(parameters[i].plotid)
-
-		self.trendsPw = []
-		for i in plotids:
-			axis = DummyAxis
-			if i == len(plotids) - 1: axis = DateAxis
-			pw = pyqtgraph.PlotWidget(axisItems={'bottom': axis(orientation='bottom')})
-			#pw.getAxis('left').setTickSpacing(1, 0.5)
-			if i > 0:
-				pw.setXLink(self.trendsPw[0])
-			pw.getViewBox().setMouseMode(pw.getViewBox().RectMode) # one button mode
-			pw.showGrid(x=True, y=True)
-			splitter1.addWidget(pw)
-			self.trendsPw.append(pw)
-
-		for i in parameters:
-			self.trendsPw[parameters[i].plotid].setLabel('left', text=parameters[i].name, units=parameters[i].unit)
+		self.allCurvesSplitter.addWidget(tracesSet.tracesSplitter)
+		self.allCurvesSplitter.addWidget(parametersSet.trendsSplitter)
 
 		# elements in the right part of the screen
 		right_layout = QVBoxLayout()
-
-		self.c_frames = {}
-		self.c_names = {}
-		self.c_units = {}
-		self.c_limits = {}
-		self.c_values = {}
-		self.c_infos = {}
-
-		def mkQLabel(objectName, text='', alignment=Qt.AlignLeft):
-			o = QLabel()
-			o.setObjectName(objectName)
-			o.setAlignment(alignment)
-			o.setText(text)
-			return o
-
-		for i in range(len(parameters)):
-			self.c_frames[i] = QGroupBox()
-			self.setFrameStyleSheet(i)
-			self.c_frames[i].setFlat(True);
-			vbox = QVBoxLayout(self.c_frames[i])
-			vbox.setSpacing(0)
-
-			self.c_names[i]  = mkQLabel('c_names', parameters[i].name, Qt.AlignLeft | Qt.AlignTop)
-			self.c_units[i]  = mkQLabel('c_units', parameters[i].unit, Qt.AlignRight | Qt.AlignTop)
-			self.c_limits[i] = mkQLabel('c_limits', str(parameters[i].min)+"-"+str(parameters[i].max), Qt.AlignRight | Qt.AlignTop)
-			self.c_values[i] = mkQLabel('c_values', '-', Qt.AlignRight | Qt.AlignTop)
-			self.c_infos[i]  = mkQLabel('c_infos', parameters[i].info)
-
-			hbox = QHBoxLayout()
-			hbox.addWidget(self.c_names[i])
-
-			vbox2 = QVBoxLayout()
-			vbox2.addWidget(self.c_units[i])
-			vbox2.addWidget(self.c_limits[i])
-			hbox.addLayout(vbox2)
-
-			vbox.addLayout(hbox)
-			vbox.addWidget(self.c_values[i])
-			vbox.addWidget(self.c_infos[i])
-			right_layout.addWidget(self.c_frames[i])
-
+		right_layout.addLayout(parametersSet.numericLayout)
 		right_layout.addStretch()
 
 		def makeButton(text, function):
@@ -275,13 +453,15 @@ class MonitorGUI(QWidget):
 		gb.setFlat(True);
 		gb.setObjectName('clock')
 		ly = QVBoxLayout(gb)
+		ly.setSpacing(0)
+		ly.setContentsMargins(4, 2, 4, 2)
 		ly.addWidget(timeLabel)
 		ly.addWidget(self.clockLabel)
 		right_layout.addWidget(gb)
 
 		## entire screen
 		container_layout = QHBoxLayout(self)
-		container_layout.addLayout(left_layout)
+		container_layout.addWidget(self.allCurvesSplitter)
 		container_layout.addLayout(right_layout)
 
 		## Display the widget as a new window
@@ -305,53 +485,20 @@ class MonitorGUI(QWidget):
 		# Start timers
 		self.timerUpdateUi.start(50)
 		self.timerClock.start(1000)
-		self.trends_time_ref = time.time()
 
 		# ~ for btn in self.buttons:
 			# ~ # right_layout.addWidget(btn)
 			# ~ btn.setStyleSheet("")
 
 	def timerUpdateUiTimeout(self):
-		global beat
-		if (self.div_refresh_values > 0):
-			self.div_refresh_values-=1
-		if (self.div_refresh_values <= 0):
-			self.div_refresh_values=5
+		tracesSet.update()
+		parametersSet.updateParametersWidgets()
 
-			if beat:
-				# ~ parameters[PR].info = parameters[PR].info + u'❤'
-				parameters[PR].info = u'❤'
-				beat=False
+		if (time.time() > self.last_graphed_time+2):
+			self.last_graphed_time = time.time()
 
-			for i in range(len(parameters)):
-				self.c_values[i].setText(parameters[i].getValueStr())
-				self.c_infos[i].setText(parameters[i].info)
-				self.setFrameStyleSheet(i)
-
-			if (time.time() > self.last_graphed_time+2):
-				self.last_graphed_time = time.time()
-
-				# update trends
-				self.trends_time.append(time.time() - self.trends_time_ref)
-				for i in range(len(parameters)):
-					parameters[i].copyValueToTrends()
-
-				for pw in self.trendsPw:
-					pw.clear()
-
-				for i in range(len(parameters)):
-					self.trendsPw[parameters[i].plotid].plot(self.trends_time, parameters[i].trends, pen=parameters[i].color, connect='finite')
-
-		global X_fast_oximeter, Y_fast_oximeter, Y_fast_oximeter_index
-		self.oximeter.plot(X_fast_oximeter, Y_fast_oximeter, clear=True, pen=parameters[SPO2].color, connect='finite')
-
-	def setFrameStyleSheet(self, i):
-		if math.isnan(parameters[i].value):
-			self.c_frames[i].setStyleSheet("QGroupBox { border: 1px solid %s; border-radius: 8px; } QLabel { color: #555555; background-color: transparent; }" % (parameters[i].color));
-		elif (parameters[i].value < parameters[i].min or parameters[i].value > parameters[i].max):
-			self.c_frames[i].setStyleSheet("QGroupBox { border: 4px solid %s; border-radius: 8px; background-color: #ff0000; } QLabel { color: #000000; background-color: transparent; }" % parameters[i].color);
-		else:
-			self.c_frames[i].setStyleSheet("QGroupBox { border: 1px solid %s; border-radius: 8px; } QLabel { color: %s; }" % (parameters[i].color, parameters[i].color));
+			# update trends
+			parametersSet.updateTrends()
 
 	def keyPressEvent(self, event):
 		if (event.key() ==  Qt.Key_F11):
@@ -388,14 +535,16 @@ class MonitorGUI(QWidget):
 		self.clockLabel.setText(val)
 
 	def btnReset(self):
-		self.trends_time = []
-		self.trends_time_ref = time.time()
-		for i in range(len(parameters)):
-			parameters[i].trends = []
+		for pw in parametersSet.trendsPw:
+			pw.clear()
+		parametersSet.trends_time = []
+		parametersSet.trends_time_ref = time.time()
+		for p in parametersSet.parameters:
+			parametersSet.parameters[p].trends = []
 		self.last_graphed_time = 0
 
 	def btnAutoRange(self):
-		for pw in self.trendsPw:
+		for pw in parametersSet.trendsPw:
 			pw.enableAutoRange()
 
 	def closeEvent(self, event):
@@ -429,7 +578,7 @@ class DateAxis(pyqtgraph.AxisItem):
 		for value in values:
 			try:
 				# pyqtgraph seems to don't handle so large numbers on raspberry pi so we're using a reference
-				strns.append(time.strftime(string, time.localtime(value + m1.trends_time_ref)))
+				strns.append(time.strftime(string, time.localtime(value + parametersSet.trends_time_ref)))
 			except ValueError:  ## Windows can't handle dates before 1970
 				strns.append('')
 		return strns
@@ -443,23 +592,10 @@ class DummyAxis(pyqtgraph.AxisItem):
 		return ''
 
 def main():
-	global m1, oxi1
 	app = QApplication(sys.argv)
 	m1 = MonitorGUI()
-
-	oxi1 = usb_oximeter.Oximeter()
-	oxi1.assignSerialPorts(("/dev/ttyUSB0", "/dev/ttyUSB1"))
-	oxi1.setCallback(OximeterCallback)
-
-	threads = []
-	threads.append(threading.Thread(target=oxi1.worker))
-	threads[0].daemon = True
-	threads[0].start()
-
-	m1.last_graphed_time = 0
 	app.installEventFilter(m1)
 	ret = app.exec_()
-	oxi1.stop()
 	sys.exit(ret)
 
 if __name__ == '__main__':
