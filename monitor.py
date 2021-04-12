@@ -27,13 +27,15 @@ def pipInstall(package):
 		raise
 
 try:
-	from PyQt4.QtGui import *
-	from PyQt4.QtCore import *
+	from PyQt5.QtGui import *
+	from PyQt5.QtCore import *
+	from PyQt5.QtWidgets import *
+	print("*** Using PyQT5 ***")
 except:
 	try:
-		from PyQt5.QtGui import *
-		from PyQt5.QtCore import *
-		from PyQt5.QtWidgets import *
+		from PyQt4.QtGui import *
+		from PyQt4.QtCore import *
+		print("*** Using PyQT4 ***")
 	except:
 		pipInstall("pyqt5")
 
@@ -419,13 +421,6 @@ class MonitorGUI(QWidget):
 		def makeButton(text, function):
 			btn = QPushButton(text)
 			btn.setFocusPolicy(Qt.TabFocus)
-			#btn.setAutoFillBackground(True);
-			# ~ #palette_red.setColor(btn.backgroundRole(), QColor(255, 0, 0, 127))
-			# ~ p = btn.palette()
-			# ~ p.setColor(btn.backgroundRole(), Qt.red)
-			# ~ btn.setPalette(p);
-			btn.setStyleSheet("border: none;") # workaround for PyQt5 bug with button background color
-			# ~ btn.setStyleSheet("") # workaround for PyQt5 bug with button background color
 			btn.clicked.connect(function)
 			return btn
 
@@ -438,7 +433,6 @@ class MonitorGUI(QWidget):
 
 		for btn in self.buttons:
 			right_layout.addWidget(btn)
-			# ~ btn.setStyleSheet("")
 
 		# clock
 		timeLabel = QLabel("Time")
@@ -482,10 +476,6 @@ class MonitorGUI(QWidget):
 		# Start timers
 		self.timerUpdateUi.start(50)
 		self.timerClock.start(1000)
-
-		# ~ for btn in self.buttons:
-			# ~ # right_layout.addWidget(btn)
-			# ~ btn.setStyleSheet("")
 
 	def timerUpdateUiTimeout(self):
 		tracesSet.update()
