@@ -47,9 +47,6 @@ try:
 except:
 	pipInstall("pyqtgraph")
 
-pyqtgraph.setConfigOptions(useOpenGL=True)
-pyqtgraph.setConfigOptions(antialias=True)
-
 try:
 	import serial
 except:
@@ -195,9 +192,9 @@ class Parameter():
 	def createWidgets(self):
 		class QValueLabel(QLabel):
 			def sizeHint(self):
-				return super().sizeHint() + QSize(0, -14)
+				return super(QValueLabel, self).sizeHint() + QSize(0, -14)
 			def minimumSizeHint(self):
-				return super().minimumSizeHint() + QSize(0, -14)
+				return super(QValueLabel, self).minimumSizeHint() + QSize(0, -14)
 
 		def mkQLabel(objectName, text='', alignment=Qt.AlignLeft, o=None):
 			if o is None:
