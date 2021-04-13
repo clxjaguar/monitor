@@ -339,7 +339,8 @@ class Plugin():
 
 	def load(self):
 		try:
-			self.PluginClass = self.module.MonitorPlugin(parametersSet, tracesSet)
+			handlers = {'parametersSet':parametersSet, 'tracesSet':tracesSet}
+			self.PluginClass = self.module.MonitorPlugin(handlers)
 			self.PluginClass.load()
 		except Exception as e:
 			print('PLUGIN ERROR (%s): %s' % (self.name, e))

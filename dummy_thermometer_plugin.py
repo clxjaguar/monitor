@@ -4,10 +4,10 @@
 import random, time, threading
 
 class MonitorPlugin():
-	def __init__(self, parametersSet, tracesSet):
+	def __init__(self, handlers):
 		print("Dummy thermometer plugin init")
-		self.parametersSet = parametersSet
-		self.tracesSet = tracesSet
+		self.parametersSet = handlers['parametersSet']
+		self.tracesSet = handlers['tracesSet']
 		self.value = 37
 		self.initialValue = 37
 

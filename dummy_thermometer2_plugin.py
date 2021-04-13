@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 class MonitorPlugin():
-	def __init__(self, parametersSet, tracesSet):
+	def __init__(self, handlers):
 		print("Dummy thermometer plugin init")
-		self.parametersSet = parametersSet
+		self.parametersSet = handlers['parametersSet']
 		self.value = 37
 		self.initialValue = 39.2
 

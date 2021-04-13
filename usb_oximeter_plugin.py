@@ -4,10 +4,10 @@
 import usb_oximeter, threading
 
 class MonitorPlugin():
-	def __init__(self, parametersSet, tracesSet):
+	def __init__(self, handlers):
 		print("USB Oximeter plugin init")
-		self.parametersSet = parametersSet
-		self.tracesSet = tracesSet
+		self.parametersSet = handlers['parametersSet']
+		self.tracesSet = handlers['tracesSet']
 		self.beat = 0
 
 	def load(self):
