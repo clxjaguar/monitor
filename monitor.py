@@ -392,7 +392,7 @@ class MonitorGUI(QWidget):
 			QLabel { margin: 0px; padding-top: 0px; padding-bottom: 0px; } \
 			QSplitter::handle:vertical   { image: none; } \
 			QSplitter::handle:horizontal { width:  2px; image: none; } \
-			QPushButton { background-color: #404040; background: #404040; } \
+			QPushButton { color: #ffffff; background-color: #404040; } \
 			QLabel#names { font-size: 30pt; } \
 			QLabel#units { font-size: 20pt; } \
 			QLabel#limits { font-size: 10pt; } \
@@ -417,21 +417,24 @@ class MonitorGUI(QWidget):
 		right_layout.addLayout(parametersSet.numericLayout)
 		right_layout.addStretch()
 
-		def makeButton(text, function):
+		def makeButton(text, function=None, layout=None, gridPlacement=(0,0), gridSpan=(1,1)):
 			btn = QPushButton(text)
 			btn.setFocusPolicy(Qt.TabFocus)
-			btn.clicked.connect(function)
+			if function:
+				btn.clicked.connect(function)
+			if type(layout) == QGridLayout:
+				layout.addWidget(btn, gridPlacement[0], gridPlacement[1], gridSpan[0], gridSpan[1])
+			elif layout:
+				layout.addWidget(btn)
 			return btn
 
 		# buttons
-		self.buttons = []
-		self.buttons.append(makeButton("Clear plots", self.btnReset))
-		self.buttons.append(makeButton("Autorange", self.btnAutoRange))
-		self.buttons.append(makeButton("Full/Window", self.btnFullScreen))
-		self.buttons.append(makeButton("Exit", self.close))
-
-		for btn in self.buttons:
-			right_layout.addWidget(btn)
+		buttonsLayout = QGridLayout()
+		makeButton("Clear plots",   self.btnReset,        buttonsLayout, (0, 0))
+		makeButton("Autorange",     self.btnAutoRange,    buttonsLayout, (0, 1))
+		makeButton("Fullscreen",    self.btnFullScreen,   buttonsLayout, (1, 0))
+		makeButton("Exit",          self.close,           buttonsLayout, (1, 1))
+		right_layout.addLayout(buttonsLayout)
 
 		# clock
 		timeLabel = QLabel("Time")
