@@ -140,6 +140,7 @@ class TracesSet():
 	def removeTrace(self, ident):
 		del self.traces[ident]
 
+blinkState = False
 class Parameter():
 	NO_SIGNAL = 1
 	ALARM     = 2
@@ -173,21 +174,23 @@ class Parameter():
 		else:                       newState = self.NOMINAL
 
 		if newState != self.frameState or force:
-			if force:
-				self.frameState = self.DEFAULT
-			else:
-				self.frameState = newState
-
+			self.frameState = newState
 			if newState == self.NO_SIGNAL:
 				styleStr = "QGroupBox { border: 1px solid $PARAMCOLOR; } QLabel { color: #555555; background-color: transparent; }"
 			elif newState == self.ALARM:
-				styleStr = "QGroupBox { border: 4px solid $PARAMCOLOR; background-color: #ff0000; } QLabel { color: #000000; background-color: transparent; }"
+				if blinkState:
+					styleStr = "QGroupBox { border: 4px solid $PARAMCOLOR; background-color: #ff0000; } QLabel { color: #000000; background-color: transparent; }"
+				else:
+					styleStr = "QGroupBox { border: 4px solid $PARAMCOLOR; } QLabel { color: $PARAMCOLOR; }"
 			elif newState == self.NOMINAL:
 				styleStr = "QGroupBox { border: 1px solid $PARAMCOLOR; } QLabel { color: $PARAMCOLOR; }"
 			else:
 				styleStr = ""
 
 			self.widget.setStyleSheet(styleStr.replace("$PARAMCOLOR", self.color))
+
+	def isInAlarmState(self):
+		return self.frameState == self.ALARM
 
 	def createWidgets(self):
 		class QValueLabel(QLabel):
@@ -205,6 +208,7 @@ class Parameter():
 			return o
 
 		self.widget = QGroupBox()
+		self.widget.mouseReleaseEvent=self.clicked
 		self.widget.setFlat(True);
 		vbox = QVBoxLayout(self.widget)
 		vbox.setSpacing(0)
@@ -233,6 +237,10 @@ class Parameter():
 		vbox.addWidget(self.infosLabel)
 		self.updateFrameStyleSheet(force=True)
 
+	def clicked(self, event):
+		print(self.ident, event, "clicked!")
+		parametersSet.removeParameter(self.ident)
+
 	def updateValue(self, value):
 		if value != self.value:
 			self.value = value
@@ -240,7 +248,6 @@ class Parameter():
 	def updateWidgets(self):
 		self.valueLabel.setText(self.getValueStr())
 		self.infosLabel.setText(self.info)
-		self.updateFrameStyleSheet()
 
 	def copyValueToTrends(self):
 		self.trends.append(self.value)
@@ -320,7 +327,14 @@ class ParametersSet():
 			parameter = self.parameters[ident]
 			if parameter.nextRefresh <= time.time():
 				parameter.updateWidgets()
-				parameter.nextRefresh = time.time() + 0.2
+				parameter.updateFrameStyleSheet()
+				parameter.nextRefresh = time.time() + 0.5
+
+	def updateBlinkingFramesStyleSheets(self):
+		for ident in self.parameters:
+			parameter = self.parameters[ident]
+			if parameter.isInAlarmState():
+				parameter.updateFrameStyleSheet(force=True)
 
 	def removeParameter(self, ident):
 		self.numericLayout.removeWidget(self.parameters[ident].widget)
@@ -477,7 +491,7 @@ class MonitorGUI(QWidget):
 
 		# Start timers
 		self.timerUpdateUi.start(50)
-		self.timerClock.start(1000)
+		self.timerClock.start(500)
 
 	def timerUpdateUiTimeout(self):
 		tracesSet.update()
@@ -520,6 +534,9 @@ class MonitorGUI(QWidget):
 			self.setCursor(Qt.BlankCursor)
 
 	def timerClockTimeout(self):
+		global blinkState
+		blinkState = not blinkState
+		parametersSet.updateBlinkingFramesStyleSheets()
 		val = time.strftime("%H:%M:%S", time.localtime(time.time()))
 		self.clockLabel.setText(val)
 
