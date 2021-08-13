@@ -338,6 +338,7 @@ class ParametersSet():
 
 	def removeParameter(self, ident):
 		self.numericLayout.removeWidget(self.parameters[ident].widget)
+		self.parameters[ident].widget.hide()
 		del self.parameters[ident]
 
 class Plugin():
