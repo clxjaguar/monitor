@@ -286,19 +286,22 @@ class ParametersSet():
 
 		self.trends_time = []
 		self.trendsPw = []
-		first = True
 		for plotName in plotsNames:
-			axis = DummyAxis
-			if len(self.trendsPw) == len(plotsNames)-1: axis = DateAxis
-			pw = pyqtgraph.PlotWidget(axisItems={'bottom': axis(orientation='bottom')})
-			if not first:
-				pw.setXLink(self.trendsPw[0])
+			pw = pyqtgraph.PlotWidget()
 			pw.getViewBox().setMouseMode(pw.getViewBox().RectMode) # one button mode
 			pw.getAxis('left').setWidth(50)
 			pw.showGrid(x=True, y=True)
 			self.trendsSplitter.addWidget(pw)
 			self.trendsPw.append(pw)
-			first=False
+
+			# hide the time axis tick values for all but the last trend plot
+			if len(self.trendsPw) < len(plotsNames):
+				pw.getAxis('bottom').style['showValues'] = False
+				pw.getAxis('bottom').showLabel(False)
+
+			# synchronize the times axis for all trends plots
+			if len(self.trendsPw) > 0:
+				pw.setXLink(self.trendsPw[0])
 
 		for p in self.parameters:
 			self.trendsPw[self.parameters[p].plotId].setLabel('left', text=self.parameters[p].plotName, units=self.parameters[p].unit)
@@ -590,13 +593,6 @@ class DateAxis(pyqtgraph.AxisItem):
 				strns.append('')
 		return strns
 
-class DummyAxis(pyqtgraph.AxisItem):
-	def __init__(self, orientation):
-		super(DummyAxis, self).__init__(orientation)
-		self.setHeight(0)
-
-	def tickStrings(self, values, scale, spacing):
-		return ''
 
 def main():
 	app = QApplication(sys.argv)
