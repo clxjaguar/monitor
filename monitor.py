@@ -266,6 +266,7 @@ class ParametersSet():
 	def initialyzeWidgets(self):
 		self.numericLayout = QVBoxLayout()
 		self.trendsSplitter = QSplitter(Qt.Vertical)
+		self.trendsSplitter.splitterMoved.connect(self.updateTimeAxisTicksVisibility)
 		self.plots = {}
 		self.trendsPw = []
 
@@ -305,6 +306,24 @@ class ParametersSet():
 
 		for p in self.parameters:
 			self.trendsPw[self.parameters[p].plotId].setLabel('left', text=self.parameters[p].plotName, units=self.parameters[p].unit)
+
+	def updateTimeAxisTicksVisibility(self):
+		splitterSizes = self.trendsSplitter.sizes()
+
+		flag = False
+		for i in reversed(range(self.trendsSplitter.count())):
+			axis = self.trendsSplitter.widget(i).getAxis('bottom')
+			if flag:
+				if axis.style['showValues'] != False:
+					axis.style['showValues'] = False
+					axis.showLabel(False)
+			else:
+				if axis.style['showValues'] != True:
+					axis.style['showValues'] = True
+					# we would also set axis.showLabel(True) if there was one
+
+			if splitterSizes[i] > 0: # not collapsed
+				flag = True
 
 	def updateTrends(self):
 		self.trends_time.append(time.time() - self.trends_time_ref)
